@@ -1,9 +1,8 @@
 # Product Selector Starter
 
-## Stop making customers search. Let them talk.
+## Customers know their need, not your catalogue. Stop making them search — let them talk.
 
-**Your customers know their need — not your product catalogue.** Companies with
-large catalogues of technical products lose people at the very first step: a
+Companies with large catalogues of technical products lose people at the very first step: a
 visitor arrives with a need in their own words — *"I'm building a
 battery-powered smart-home sensor that needs to speak Matter"* — and the website
 answers with dozens of dense spec sheets and filter tables. They don't know
