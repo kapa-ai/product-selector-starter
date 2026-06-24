@@ -1,9 +1,10 @@
 # Product Selector Starter
 
-## The problem
+## Stop making customers search. Let them talk.
 
-Companies with large catalogues of technical products lose people at the very
-first step. A visitor arrives with a need in their own words — *"I'm building a
+**Your customers know their need — not your product catalogue.** Companies with
+large catalogues of technical products lose people at the very first step: a
+visitor arrives with a need in their own words — *"I'm building a
 battery-powered smart-home sensor that needs to speak Matter"* — and the website
 answers with dozens of dense spec sheets and filter tables. They don't know
 which filters even matter for *this* company's products, so they can't translate
@@ -52,7 +53,7 @@ more than the five built in.
 
 A quick map, in the order you'll most likely want it:
 
-1. **What it is** — the [problem](#the-problem) and [what this is](#what-this-is) (above).
+1. **What it is** — the problem and the solution (above).
 2. **[Run it locally](#quick-start)** — a working version in three commands.
 3. **[Make it yours](#make-it-yours)** — the ~10% of configuration for your company.
    - **[Your products](#your-products)** — connect a PIM/database (recommended) or a spreadsheet.
