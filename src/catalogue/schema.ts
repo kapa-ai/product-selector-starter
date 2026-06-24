@@ -21,14 +21,14 @@ export type ProductCategory = string;
 
 /** A product family / series — summary-level row. */
 export interface ProductFamily {
-  category: ProductCategory;
-  [column: string]: string | null;
+  category?: ProductCategory;
+  [column: string]: string | null | undefined;
 }
 
 /** A specific orderable part number — full-spec row. */
 export interface ProductPart {
-  category: ProductCategory;
-  [column: string]: string | null;
+  category?: ProductCategory;
+  [column: string]: string | null | undefined;
 }
 
 export interface Catalogue {
