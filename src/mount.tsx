@@ -54,6 +54,26 @@ export function mountWidget(config: WidgetConfig): void {
   shadow.appendChild(styleSlot);
   shadow.appendChild(appSlot);
 
+  // Inherited CSS properties (line-height, font, color, letter-spacing, …) cross
+  // the shadow boundary via the host element, so an aggressive host page (e.g.
+  // `div { line-height: 3 }`) would leak into any SDK text that doesn't set its
+  // own. Establish a clean typographic baseline on this in-shadow wrapper — host
+  // selectors can't target it, and an explicit value beats the inherited one.
+  Object.assign(appSlot.style, {
+    lineHeight: "1.5",
+    fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+    fontSize: "14px",
+    fontWeight: "400",
+    fontStyle: "normal",
+    letterSpacing: "normal",
+    wordSpacing: "normal",
+    textTransform: "none",
+    textAlign: "left",
+    textIndent: "0",
+    whiteSpace: "normal",
+    color: "#0d0d0f",
+  });
+
   const cache = createCache({ key: "psw", container: styleSlot });
 
   const theme = extendTheme({
