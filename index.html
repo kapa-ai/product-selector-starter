@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Product Selector — Embed Playground</title>
+    <style>
+      /* ──────────────────────────────────────────────────────────────
+         DELIBERATELY HOSTILE HOST-PAGE CSS.
+         If Shadow DOM isolation works, NONE of this should affect the
+         widget (no purple buttons, no Comic Sans, no 4px borders inside).
+         ────────────────────────────────────────────────────────────── */
+      * { box-sizing: border-box; }
+      body {
+        font-family: "Comic Sans MS", cursive;
+        margin: 0;
+        background: #f5f5f7;
+        color: #222;
+      }
+      button {
+        background: rebeccapurple !important;
+        color: yellow !important;
+        border: 4px dashed lime !important;
+        font-size: 28px !important;
+        padding: 20px !important;
+      }
+      div { line-height: 3 !important; }
+      .host-content { max-width: 720px; margin: 60px auto; padding: 0 24px; }
+      h1 { font-size: 40px; }
+    </style>
+  </head>
+  <body>
+    <div class="host-content">
+      <h1>Acme Semiconductor — Products</h1>
+      <p>
+        This page simulates a customer's website with aggressive global CSS.
+        The product-selector widget should appear as a bubble in the
+        bottom-right and remain visually untouched by the styles above.
+      </p>
+      <button>A host-page button (purple, ugly — on purpose)</button>
+    </div>
+
+    <!-- In production this is one line: <script src="product-selector.js"> -->
+    <script type="module">
+      import { init } from "/src/embed.tsx";
+      init({
+        // These come from your Kapa admin panel (safe to expose — not secret).
+        // Set PROJECT_ID and INTEGRATION_ID in .env.
+        projectId: import.meta.env.PROJECT_ID || "demo-project-id",
+        integrationId: import.meta.env.INTEGRATION_ID || "demo-integration-id",
+        // Your deployed token endpoint (see /server). For the styling-only
+        // playground this can stay unset.
+        sessionEndpoint: "/api/agent-session",
+      });
+    </script>
+  </body>
+</html>
