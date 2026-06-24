@@ -13,6 +13,39 @@ It ships with **three ready-made example domains** — wireless chips, water pum
 > five built-in tools cover the common cases; you can add your own Kapa tools in
 > `src/agent/tools.tsx` whenever you need more.
 
+## What the built-in tools do
+
+Five tools ship ready to use — the agent calls them as the conversation needs,
+and each renders its own UI. (Add your own in `src/agent/tools.tsx`.)
+
+| Tool | What it does |
+| --- | --- |
+| `search_products` | Precise, deterministic filtering over your catalogue → a ranked, capped results list with "Show all". |
+| `get_product_specs` | Full spec sheet for one product. |
+| `compare_products` | Side-by-side visual comparison of two products. |
+| `discover_requirements` | A short guided questionnaire (toggleable) for unsure visitors; answers drive the next search. |
+| `book_meeting` | An approval-gated contact form; the lead goes to email / webhook / your CRM. |
+
+The examples below are from the shipped **Acme** semiconductor example. (The grey
+line under each agent reply — e.g. `discover_requirements (user_context: …)` — is
+the built-in, collapsible tool-call disclosure showing exactly what the agent
+called.)
+
+**Guided discovery** — when a visitor is unsure, the agent launches clickable
+questions and turns the answers into a search:
+
+<img src="docs/img/acme-guided-discovery.png" alt="Guided discovery: clickable questions" width="420" />
+
+**Side-by-side comparison** — `compare_products` renders a visual spec card; the
+agent adds a one-line takeaway instead of re-typing the table:
+
+<img src="docs/img/acme-compare.png" alt="Side-by-side product comparison card" width="420" />
+
+**Book a call** — `book_meeting` shows the contact form immediately; the lead is
+routed to your inbox, a webhook, or your CRM:
+
+<img src="docs/img/acme-contact-sales.png" alt="Book-a-call contact form" width="420" />
+
 ## Quick start
 
 ```bash
@@ -33,30 +66,35 @@ bubble still renders, but a sent message will stall — the token can't be minte
 The same handlers deploy to production separately; the secret key never enters
 the browser bundle.
 
-## Build the embeddable bundle
+## Build & add it to your site
 
 ```bash
 npm run build               # → dist/product-selector.js (single self-contained file)
 ```
 
-Host that file on any CDN/static host and embed it:
+`dist/product-selector.js` is one self-contained file. **Add it to your website
+exactly like any other script** — serve it alongside your existing static assets
+and include the two lines below. If you already run a website, you already have
+everywhere you need to put this; there's no special CDN or hosting to set up.
 
 ```html
-<script src="https://your-cdn.com/product-selector.js" defer></script>
+<script src="/product-selector.js" defer></script>
 <script>
   ProductSelector.init({
     projectId: "your-kapa-project-id",
     integrationId: "your-kapa-integration-id",
-    sessionEndpoint: "https://your-backend.com/api/agent-session",
-    bookEndpoint: "https://your-backend.com/api/book-lead",
+    sessionEndpoint: "/api/agent-session",   // your token endpoint (see /server)
+    bookEndpoint: "/api/book-lead",
     accentColor: "#0D2B73",
-    logo: "https://your-site.com/logo.svg",
+    logo: "/logo.svg",
     title: "Product Selector",
   });
 </script>
 ```
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for all `init()` options.
+The only backend you need is the small token endpoint in [`/server`](server/README.md)
+(it keeps your Kapa API key off the browser). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+for all `init()` options.
 
 ## Try the other examples
 
@@ -71,11 +109,27 @@ export { config as selectorConfig } from "./examples/water-pumps/config";
 
 Options: `semiconductors` · `water-pumps` · `espresso-machines`.
 
+## Your product data: connect a PIM/database, or use a spreadsheet
+
+All catalogue lookups (`search` / `specs` / `compare`) go through one place —
+`src/catalogue/lookup.ts` — so you choose where the data lives:
+
+- **Recommended: integrate your PIM / product database.** Most companies already
+  keep their catalogue in a PIM or product DB. Wiring the selector to that gives a
+  single source of truth that's always current — price changes, new SKUs, and
+  availability show up with no rebuilds. The lookup functions are the integration
+  seam: back them with a call to your own `/api/catalogue` endpoint (which queries
+  your PIM/DB), or run the query directly. See the swap-in note at the top of
+  `src/catalogue/lookup.ts`. Your declared `search.filters` stay identical — only
+  the data source changes.
+- **No PIM/DB available? Use the static spreadsheet approach.** Drop your
+  `.xlsx`/`.csv` in `catalogue/source/` and run `npm run generate:catalogue` to
+  bake it into a single typed data file (what the examples ship with). Quickest way
+  to get live; just re-run the generator whenever the catalogue changes.
+
 ## Make it yours
 
-1. **Catalogue** — drop your `.xlsx`/`.csv` in `catalogue/source/`, point
-   `CONFIG.outFile` in `scripts/generate-catalogue.ts` at your example's
-   `data.ts`, and run `npm run generate:catalogue`.
+1. **Catalogue** — connect your PIM/database, or generate from a spreadsheet (see above).
 2. **Config** — edit your example's `config.ts`: branding, the system prompt
    (`customInstructions`), the search **filters**, guided-path questions, the
    compare spec-rows, and booking. See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md).
