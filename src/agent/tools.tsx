@@ -8,6 +8,7 @@ import { CompareCard } from "./components/CompareCard";
 import { SearchResults } from "./components/SearchResults";
 import { QuestionForm } from "./components/QuestionForm";
 import { BookingForm } from "./components/BookingForm";
+import { ToolCall } from "./components/ToolCall";
 import type { Palette } from "./palette";
 
 export interface ToolRuntime {
@@ -65,17 +66,19 @@ export function buildTools(
       description:
         "Search the product catalogue. Returns matching products ranked by relevance. The full ranked list is shown to the user as an interactive component. All parameters are optional.",
       parameters: z.object(searchShape),
-      render: ({ result }) => (
-        <SearchResults
-          result={result}
-          palette={runtime.palette}
-          categoryLabels={catalogue.categoryLabels}
-          partNumberKey={catalogue.fields.partNumber}
-          familyKey={catalogue.fields.familyName}
-          urlKey={catalogue.fields.partUrl}
-          specRows={config.compare.rows.slice(0, 3)}
-          maxResults={config.search.maxResults ?? 15}
-        />
+      render: ({ args, result }) => (
+        <ToolCall name="search_products" args={args} result={result} palette={runtime.palette}>
+          <SearchResults
+            result={result}
+            palette={runtime.palette}
+            categoryLabels={catalogue.categoryLabels}
+            partNumberKey={catalogue.fields.partNumber}
+            familyKey={catalogue.fields.familyName}
+            urlKey={catalogue.fields.partUrl}
+            specRows={config.compare.rows.slice(0, 3)}
+            maxResults={config.search.maxResults ?? 6}
+          />
+        </ToolCall>
       ),
       execute: async (params) => searchProducts(catalogue, config.search, params as never),
     }),
@@ -105,13 +108,15 @@ export function buildTools(
       parameters: z.object({
         part_numbers: z.array(z.string()).length(2).describe("Array of exactly 2 part numbers to compare."),
       }),
-      render: ({ result }) => (
-        <CompareCard
-          result={result}
-          rows={config.compare.rows}
-          palette={runtime.palette}
-          categoryLabels={catalogue.categoryLabels}
-        />
+      render: ({ args, result }) => (
+        <ToolCall name="compare_products" args={args} result={result} palette={runtime.palette}>
+          <CompareCard
+            result={result}
+            rows={config.compare.rows}
+            palette={runtime.palette}
+            categoryLabels={catalogue.categoryLabels}
+          />
+        </ToolCall>
       ),
       execute: async (params) =>
         compareProducts(
@@ -134,9 +139,11 @@ export function buildTools(
         parameters: z.object({
           user_context: z.string().optional().describe("Any context the user already provided about their project."),
         }),
-        render: ({ status }) =>
+        render: ({ status, args }) =>
           status === "completed" ? (
-            <QuestionForm questions={config.guidedPaths.questions} palette={runtime.palette} />
+            <ToolCall name="discover_requirements" args={args} palette={runtime.palette}>
+              <QuestionForm questions={config.guidedPaths.questions} palette={runtime.palette} />
+            </ToolCall>
           ) : null,
         execute: async () => ({
           displayed: true,
@@ -155,10 +162,12 @@ export function buildTools(
         displayName: "Book Meeting",
         description:
           config.booking.toolDescription ??
-          "Collect contact details and book a call with a sales/applications engineer (also use for pricing inquiries).",
+          "Show a contact form to book a call with a sales/applications engineer (also for pricing). Call this DIRECTLY as soon as the visitor shows interest — the form itself collects their name, email, and company, so do NOT ask for contact details in chat first.",
         needsApproval: true,
         parameters: z.object({
-          project_summary: z.string().describe("Brief summary of the visitor's project and requirements."),
+          project_summary: z
+            .string()
+            .describe("A one-line summary of what the visitor wants, inferred from the conversation (the visitor does not need to provide this)."),
           first_name: z.string().optional(),
           last_name: z.string().optional(),
           email: z.string().optional(),
@@ -166,18 +175,25 @@ export function buildTools(
           role: z.string().optional(),
           preferred_contact: z.enum(["email", "phone", "either"]).optional(),
         }),
-        render: ({ args, onApprove }) => (
-          <Suspense fallback={null}>
-            <BookingForm
-              prefill={args}
-              bookEndpoint={runtime.bookEndpoint}
-              palette={runtime.palette}
-              successMessage={successMessage}
-              onApprove={onApprove}
-            />
-          </Suspense>
+        render: ({ args, result, onApprove }) => (
+          <ToolCall name="book_meeting" args={args} result={result} palette={runtime.palette}>
+            <Suspense fallback={null}>
+              <BookingForm
+                prefill={args}
+                bookEndpoint={runtime.bookEndpoint}
+                palette={runtime.palette}
+                successMessage={successMessage}
+                onApprove={onApprove}
+              />
+            </Suspense>
+          </ToolCall>
         ),
-        execute: async () => ({ ok: true }),
+        // Runs after the visitor approves (submits) the form. Tell the model
+        // exactly what happened so it doesn't ask them to fill it out again.
+        execute: async () => ({
+          submitted: true,
+          note: "The contact form was shown and the visitor has ALREADY submitted their details — the request is complete and a confirmation is shown to them in the UI. Do NOT ask them to fill out a form or share any details. Reply with at most one short sentence confirming the request was received, or say nothing further.",
+        }),
       }),
     );
   }

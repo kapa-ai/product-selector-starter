@@ -22,8 +22,10 @@ export const QuestionForm: React.FC<{ questions: GuidedQuestion[]; palette: Pale
   const doSubmit = async (finalSelections: Record<number, string>) => {
     if (submitted) return;
     setSubmitted(true);
-    const lines = questions.map((q) => `Q${q.rank}: ${finalSelections[q.rank]}`);
-    await sendMessage(`My answers:\n${lines.join("\n")}`);
+    // Single compact line so the user-message bubble stays tight (the SDK
+    // renders multi-line markdown with loose paragraph spacing).
+    const answers = questions.map((q) => finalSelections[q.rank]).join(" · ");
+    await sendMessage(`My selections: ${answers}`);
   };
 
   const handleOptionClick = (rank: number, opt: string) => {
