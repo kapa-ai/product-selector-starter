@@ -48,6 +48,74 @@ closest to your business, see how it's wired, then swap in your own data and
 copy. You can also add your own Kapa tools in `src/agent/tools.tsx` when you need
 more than the five built in.
 
+## What's in this README
+
+A quick map, in the order you'll most likely want it:
+
+1. **What it is** — the [problem](#the-problem) and [what this is](#what-this-is) (above).
+2. **[Run it locally](#quick-start)** — a working version in three commands.
+3. **[Make it yours](#make-it-yours)** — the ~10% of configuration for your company.
+   - **[Your products](#your-products)** — connect a PIM/database (recommended) or a spreadsheet.
+4. **[What to try](#what-the-agent-does-out-of-the-box)** — exercise the five built-in tool calls, and add your own.
+
+Reference for when you need it: [add it to your site](#build--add-it-to-your-site) ·
+[the example domains](#try-the-other-examples) · [how it works](#how-it-works) ·
+[project layout](#project-layout).
+
+## Quick start
+
+```bash
+npm install
+cp .env.example .env        # add your Kapa + Resend keys
+npm run dev                 # open the local playground (index.html)
+```
+
+The playground renders the widget over a deliberately ugly host page to prove
+the styling is fully isolated (see "How it works").
+
+**The dev server is self-contained:** `npm run dev` also serves the `/server`
+handlers at `/api/agent-session` and `/api/book-lead` via Vite middleware, so a
+real conversation works locally with no separate backend. For that you need a
+valid `KAPA_API_KEY` (server, in `.env`) plus `PROJECT_ID` and
+`INTEGRATION_ID` (read by the playground's `init()`). Without them the
+bubble still renders, but a sent message will stall — the token can't be minted.
+The same handlers deploy to production separately; the secret key never enters
+the browser bundle.
+
+## Make it yours
+
+The repo is the 90%; this is the 10%. Three things to set for your company:
+
+### Your products
+
+All catalogue lookups (`search` / `specs` / `compare`) go through one place —
+`src/catalogue/lookup.ts` — so you choose where the data lives:
+
+- **Recommended: integrate your PIM / product database.** Most companies already
+  keep their catalogue in a PIM or product DB. Wiring the selector to that gives a
+  single source of truth that's always current — price changes, new SKUs, and
+  availability show up with no rebuilds. The lookup functions are the integration
+  seam: back them with a call to your own `/api/catalogue` endpoint (which queries
+  your PIM/DB), or run the query directly. See the swap-in note at the top of
+  `src/catalogue/lookup.ts`. Your declared `search.filters` stay identical — only
+  the data source changes.
+- **No PIM/DB available? Use the static spreadsheet approach.** Drop your
+  `.xlsx`/`.csv` in `catalogue/source/` and run `npm run generate:catalogue` to
+  bake it into a single typed data file (what the examples ship with). Quickest way
+  to get live; just re-run the generator whenever the catalogue changes.
+
+### Branding, prompt & filters
+
+Edit your example's `config.ts` — brand colour and logo, the welcome copy, the
+system prompt (`customInstructions`), the search **filters**, guided-path
+questions, the compare spec-rows, and booking. This is the main file you touch;
+see [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for every field.
+
+### Backend
+
+Deploy the two endpoints in [`/server`](server/README.md) (token + lead capture)
+and set your env vars.
+
 ## What the agent does out of the box
 
 Every Product Selector comes with **five tools already wired into the agent** —
@@ -95,26 +163,6 @@ routed to your inbox, a webhook, or your CRM:
 
 <img src="docs/img/acme-contact-sales.png" alt="Book-a-call contact form" width="420" />
 
-## Quick start
-
-```bash
-npm install
-cp .env.example .env        # add your Kapa + Resend keys
-npm run dev                 # open the local playground (index.html)
-```
-
-The playground renders the widget over a deliberately ugly host page to prove
-the styling is fully isolated (see "How it works").
-
-**The dev server is self-contained:** `npm run dev` also serves the `/server`
-handlers at `/api/agent-session` and `/api/book-lead` via Vite middleware, so a
-real conversation works locally with no separate backend. For that you need a
-valid `KAPA_API_KEY` (server, in `.env`) plus `PROJECT_ID` and
-`INTEGRATION_ID` (read by the playground's `init()`). Without them the
-bubble still renders, but a sent message will stall — the token can't be minted.
-The same handlers deploy to production separately; the secret key never enters
-the browser bundle.
-
 ## Build & add it to your site
 
 ```bash
@@ -157,33 +205,6 @@ export { config as selectorConfig } from "./examples/water-pumps/config";
 ```
 
 Options: `semiconductors` · `water-pumps` · `espresso-machines`.
-
-## Your product data: connect a PIM/database, or use a spreadsheet
-
-All catalogue lookups (`search` / `specs` / `compare`) go through one place —
-`src/catalogue/lookup.ts` — so you choose where the data lives:
-
-- **Recommended: integrate your PIM / product database.** Most companies already
-  keep their catalogue in a PIM or product DB. Wiring the selector to that gives a
-  single source of truth that's always current — price changes, new SKUs, and
-  availability show up with no rebuilds. The lookup functions are the integration
-  seam: back them with a call to your own `/api/catalogue` endpoint (which queries
-  your PIM/DB), or run the query directly. See the swap-in note at the top of
-  `src/catalogue/lookup.ts`. Your declared `search.filters` stay identical — only
-  the data source changes.
-- **No PIM/DB available? Use the static spreadsheet approach.** Drop your
-  `.xlsx`/`.csv` in `catalogue/source/` and run `npm run generate:catalogue` to
-  bake it into a single typed data file (what the examples ship with). Quickest way
-  to get live; just re-run the generator whenever the catalogue changes.
-
-## Make it yours
-
-1. **Catalogue** — connect your PIM/database, or generate from a spreadsheet (see above).
-2. **Config** — edit your example's `config.ts`: branding, the system prompt
-   (`customInstructions`), the search **filters**, guided-path questions, the
-   compare spec-rows, and booking. See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md).
-3. **Backend** — deploy the two endpoints in [`/server`](server/README.md) and
-   set your env vars.
 
 ## How it works
 
