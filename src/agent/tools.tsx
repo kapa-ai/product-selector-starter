@@ -39,13 +39,17 @@ export function buildTools(
   // The parameter schema is built from the active example's declared filters,
   // so it adapts to any product domain without code changes here.
   const searchShape: Record<string, z.ZodTypeAny> = {
-    category: z
-      .string()
-      .optional()
-      .describe(`Product category. One of: ${categories.join(", ")}, or "any" (default).`),
     keyword: z.string().optional().describe("Free-text search across names, descriptions, and other text fields."),
     result_type: z.enum(["families", "parts", "both"]).optional().describe("Return families, parts, or both (default)."),
   };
+  // Only offer a category filter when the catalogue actually has categories
+  // (filter-only catalogues have none).
+  if (categories.length > 0) {
+    searchShape.category = z
+      .string()
+      .optional()
+      .describe(`Product category. One of: ${categories.join(", ")}, or "any" (default).`);
+  }
   for (const f of config.search.filters) {
     let zt: z.ZodTypeAny;
     if (f.kind === "boolean") zt = z.boolean();

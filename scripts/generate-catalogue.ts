@@ -2,14 +2,17 @@
 // Catalogue generator:  spreadsheet (.xlsx / .csv)  →  an example's data.ts
 //
 // Usage:
-//   1. Drop your file in catalogue/source/ (e.g. catalogue/source/products.xlsx)
-//   2. Adjust CONFIG below to match your workbook.
+//   1. Drop your file in catalogue/source/
+//   2. Map your name/part columns in CONFIG.fields below.
 //   3. Run:  npm run generate:catalogue
 //
-// The output is a single typed TS file the agent's tools read directly — the
-// "precise lookup into a hardcoded db" requirement. No runtime DB, no network.
+// The output is a single typed TS file the agent's tools read directly. The
+// inference is fully DATA-DRIVEN (no domain knowledge): it picks a reasonable
+// set of filters from many columns and only uses categories when your data has
+// a real category column — otherwise it runs filter-only and prints candidate
+// category columns for YOU to review (designating a category is a human call).
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as XLSX from "xlsx";
@@ -17,102 +20,86 @@ import * as XLSX from "xlsx";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 
+type Row = Record<string, string | null>;
+
 const CONFIG = {
-  /** Folder scanned for the source workbook (first .xlsx/.csv found is used). */
   sourceDir: process.env.CATALOGUE_SRC ? resolve(process.env.CATALOGUE_SRC) : join(ROOT, "catalogue", "source"),
-  /**
-   * Where the generated data file is written. Point this at the example you
-   * want to populate (each example folder has a data.ts + a hand-written
-   * config.ts). The active example is chosen in src/selector.config.ts.
-   * Override either path with CATALOGUE_SRC / CATALOGUE_OUT env vars.
-   */
   outFile: process.env.CATALOGUE_OUT
     ? resolve(process.env.CATALOGUE_OUT)
     : join(ROOT, "src", "examples", "semiconductors", "data.ts"),
-  /** Import path to schema.ts, relative to outFile. */
   schemaImport: "../../catalogue/schema",
-  /** Import path to config types, relative to the generated config.ts. */
   typesImport: "../../config/types",
-  /**
-   * When true and no config.ts exists next to the data file, write a starter
-   * config.ts with search.filters + compare.rows inferred from the columns.
-   * Never overwrites an existing config.ts.
-   */
   scaffoldConfig: true,
 
-  /** Sheet names (case-insensitive). A CSV file is treated as the parts sheet. */
+  /** Sheet names (case-insensitive). A CSV / single sheet is treated as parts. */
   familiesSheet: "Families",
   partsSheet: "Parts",
 
   /**
-   * Column whose value becomes each row's `category` discriminator. If the
-   * column is missing, every row falls back to `defaultCategory`.
+   * Category facet. If a column with this name exists in the data it's used as
+   * the category. If not, the catalogue runs FILTER-ONLY and the generator
+   * prints candidate columns you could designate (set this to one and re-run).
    */
   categoryColumn: "category",
-  defaultCategory: "default",
-
-  /** Human-readable labels per category code (edit to taste). */
+  defaultCategory: "uncategorized",
   categoryLabels: {} as Record<string, string>,
+  /**
+   * OPTIONAL escape hatch for semantic groupings that no single column captures
+   * (e.g. "multi-protocol = has Zigbee OR Matter"). Ships undefined on purpose —
+   * this is domain logic YOU own, kept out of the generic generator. Example:
+   *   deriveCategory: (row) => (row["Zigbee"] === "Y" ? "mesh" : "ble"),
+   */
+  deriveCategory: undefined as undefined | ((row: Row) => string | null),
 
-  /** Field map written into the catalogue (see CatalogueFieldMap). */
+  /** Cap on auto-selected filters (the rest of the columns are still in data). */
+  maxFilters: 12,
+
+  /** Map your workbook's name/part/url/keyword columns. */
   fields: {
     familyName: "Product Family",
     partNumber: "Part Number",
-    partUrl: "url",
+    partUrl: "url" as string | undefined,
     keyword: ["Product Family", "Protocols", "Use Cases", "Description"],
   },
 };
 
 function findSource(): string {
   if (!existsSync(CONFIG.sourceDir)) {
-    throw new Error(
-      `Source folder not found: ${CONFIG.sourceDir}\n` +
-        `Create it and add your .xlsx or .csv catalogue file.`,
-    );
+    throw new Error(`Source folder not found: ${CONFIG.sourceDir}\nAdd your .xlsx or .csv there.`);
   }
   const file = readdirSync(CONFIG.sourceDir).find((f) => /\.(xlsx|xls|csv)$/i.test(f));
   if (!file) throw new Error(`No .xlsx/.xls/.csv file found in ${CONFIG.sourceDir}`);
   return join(CONFIG.sourceDir, file);
 }
 
-type Row = Record<string, string | null>;
-
 function sheetRows(wb: XLSX.WorkBook, wanted: string): Row[] {
   const name = wb.SheetNames.find((s) => s.toLowerCase() === wanted.toLowerCase());
   if (!name) return [];
-  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name], {
-    defval: null,
-    raw: false,
-  });
-  return raw.map((r) => normaliseRow(r));
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name], { defval: null, raw: false });
+  return raw.map(normaliseRow);
 }
 
 function normaliseRow(r: Record<string, unknown>): Row {
   const out: Row = {};
   for (const [k, v] of Object.entries(r)) {
-    const key = k.trim();
+    const key = k.trim().replace(/\s+/g, " "); // collapse newlines/extra spaces in headers
     if (v === null || v === undefined || v === "") out[key] = null;
-    else out[key] = String(v).trim();
+    else out[key] = String(v).trim().replace(/\s+/g, " "); // tidy values too
   }
-  // Promote the category column to the fixed `category` field.
-  const cat = out[CONFIG.categoryColumn];
-  out.category = (cat ?? CONFIG.defaultCategory) as string;
-  if (CONFIG.categoryColumn !== "category") delete out[CONFIG.categoryColumn];
   return out;
 }
 
-// ── config inference ─────────────────────────────────────────────────────────
-// Infer search.filters + compare.rows from the COLUMNS in the data we just
-// wrote (and the categories), so a brand-new catalogue gets a working starter
-// config without hand-writing it.
-
+// ── data-driven inference ─────────────────────────────────────────────────────
 type InferredFilter =
-  | { param: string; column: string; kind: "boolean"; description: string }
+  | { param: string; column: string; kind: "boolean"; trueValue: string; description: string }
   | { param: string; column: string; kind: "min" | "max"; description: string }
   | { param: string; column: string; kind: "enum"; values: string[]; description: string };
 
+type CompareRow = { label: string; key: string; suffix?: string };
+
 const NUMERIC_RE = /^\s*\d[\d.,]*\s*(?:[–-]\s*\d[\d.,]*\s*)?$/; // "512" or "512 – 1024"
-const BOOL_VALUES = new Set(["yes", "no", "true", "false"]);
+const BOOL_TRUE = ["y", "yes", "true", "1"];
+const BOOL_FALSE = ["n", "no", "false", "0"];
 
 function uniqueColumns(rows: Row[]): string[] {
   const seen: string[] = [];
@@ -121,11 +108,8 @@ function uniqueColumns(rows: Row[]): string[] {
 }
 
 function slug(col: string): string {
-  return col
-    .replace(/\([^)]*\)/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  // Keep unit/paren content so e.g. "GSPI (48MHz)" and "GSPI (low speed)" don't collide.
+  return col.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
 function labelAndSuffix(col: string): { label: string; suffix?: string } {
@@ -133,71 +117,163 @@ function labelAndSuffix(col: string): { label: string; suffix?: string } {
   return m ? { label: m[1].trim(), suffix: m[2].trim() } : { label: col };
 }
 
-function inferFilters(parts: Row[], exclude: Set<string>): InferredFilter[] {
-  const filters: InferredFilter[] = [];
-  for (const col of uniqueColumns(parts)) {
-    if (exclude.has(col)) continue;
-    const vals = parts.map((r) => r[col]).filter((v): v is string => !!v);
-    if (vals.length === 0) continue;
-    const { label } = labelAndSuffix(col);
+interface ColProfile {
+  col: string;
+  values: string[];
+  coverage: number;
+  distinct: number;
+  kind: "boolean" | "numeric" | "enum" | "text" | "skip";
+  trueValue?: string;
+  score: number; // usefulness as a filter: coverage × how well it splits the set
+}
 
-    if (vals.every((v) => BOOL_VALUES.has(v.toLowerCase()))) {
-      filters.push({ param: slug(col), column: col, kind: "boolean", description: `Require ${label}.` });
-    } else if (vals.every((v) => NUMERIC_RE.test(v))) {
-      const kind = /price|cost|budget/i.test(col) ? "max" : "min";
-      filters.push({
-        param: slug(col),
-        column: col,
-        kind,
-        description: `${kind === "max" ? "Maximum" : "Minimum"} ${label}.`,
-      });
-    } else {
-      const distinct = [...new Set(vals)];
-      if (distinct.length >= 2 && distinct.length <= 6 && distinct.every((v) => v.length <= 24)) {
-        filters.push({ param: slug(col), column: col, kind: "enum", values: distinct, description: `Filter by ${label}.` });
-      }
-      // higher-cardinality free text is skipped — add a text filter by hand if needed
+// Profile a column to decide if/how it makes a useful filter. Pure heuristics,
+// no column-name or domain assumptions beyond a price→max hint.
+function profileColumn(rows: Row[], col: string): ColProfile {
+  const values = rows.map((r) => r[col]).filter((v): v is string => v != null && v !== "");
+  const coverage = rows.length ? values.length / rows.length : 0;
+  const set = new Set(values);
+  const distinct = set.size;
+  const lowers = [...set].map((v) => v.toLowerCase());
+  const base: ColProfile = { col, values, coverage, distinct, kind: "skip", score: 0 };
+
+  const allNumeric = values.length > 0 && values.every((v) => NUMERIC_RE.test(v));
+  const idLike = allNumeric && distinct === values.length && distinct >= rows.length * 0.95;
+
+  // Drop noise: sparse, constant, or identifier-like columns make poor filters.
+  if (coverage < 0.5 || distinct <= 1 || idLike) return base;
+
+  if (lowers.every((v) => BOOL_TRUE.includes(v) || BOOL_FALSE.includes(v)) && lowers.some((v) => BOOL_TRUE.includes(v))) {
+    const trueValue = [...set].find((v) => BOOL_TRUE.includes(v.toLowerCase()))!;
+    const trueCount = values.filter((v) => BOOL_TRUE.includes(v.toLowerCase())).length;
+    const p = trueCount / values.length;
+    // Boolean feature flags are valuable facets; don't punish imbalance to zero.
+    return { ...base, kind: "boolean", trueValue, score: coverage * (0.6 + 0.4 * (1 - Math.abs(2 * p - 1))) };
+  }
+  if (allNumeric) {
+    // Slightly below categorical facets so peripheral-count columns don't dominate.
+    return { ...base, kind: "numeric", score: coverage * (distinct >= 3 ? 0.7 : 0.4) };
+  }
+  if (distinct >= 2 && distinct <= 8 && [...set].every((v) => v.length <= 24)) {
+    const counts: Record<string, number> = {};
+    for (const v of values) counts[v] = (counts[v] ?? 0) + 1;
+    const maxShare = Math.max(...Object.values(counts)) / values.length;
+    return { ...base, kind: "enum", score: coverage * (0.6 + 0.4 * (1 - maxShare)) };
+  }
+  return { ...base, kind: "text" }; // high-cardinality free text → keyword, not a filter
+}
+
+function profileAll(rows: Row[], exclude: Set<string>): ColProfile[] {
+  return uniqueColumns(rows)
+    .filter((c) => !exclude.has(c))
+    .map((c) => profileColumn(rows, c));
+}
+
+function selectFilters(profiles: ColProfile[], max: number): InferredFilter[] {
+  const usable = profiles
+    .filter((p) => (p.kind === "boolean" || p.kind === "numeric" || p.kind === "enum") && p.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // Diversify: cap each type so one kind (e.g. peripheral counts) can't crowd
+  // out the others, then fill remaining slots by score.
+  const caps: Record<string, number> = { boolean: 6, numeric: 4, enum: 3 };
+  const counts: Record<string, number> = { boolean: 0, numeric: 0, enum: 0 };
+  const chosen: ColProfile[] = [];
+  for (const p of usable) {
+    if (chosen.length >= max) break;
+    if (counts[p.kind] < caps[p.kind]) {
+      chosen.push(p);
+      counts[p.kind]++;
     }
   }
-  return filters;
-}
-
-function inferCompareRows(parts: Row[], exclude: Set<string>): Array<{ label: string; key: string; suffix?: string }> {
-  const rows: Array<{ label: string; key: string; suffix?: string }> = [];
-  for (const col of uniqueColumns(parts)) {
-    if (exclude.has(col)) continue;
-    const { label, suffix } = labelAndSuffix(col);
-    rows.push(suffix ? { label, key: col, suffix } : { label, key: col });
-    if (rows.length >= 12) break;
+  for (const p of usable) {
+    if (chosen.length >= max) break;
+    if (!chosen.includes(p)) chosen.push(p);
   }
-  return rows;
+
+  const used = new Set<string>();
+  const uniqueParam = (col: string): string => {
+    let p = slug(col);
+    const base = p;
+    for (let i = 2; used.has(p); i++) p = `${base}_${i}`;
+    used.add(p);
+    return p;
+  };
+
+  return chosen
+    .sort((a, b) => b.score - a.score)
+    .map((p) => {
+      const { label } = labelAndSuffix(p.col);
+      const param = uniqueParam(p.col);
+      if (p.kind === "boolean") return { param, column: p.col, kind: "boolean", trueValue: p.trueValue!, description: `Require ${label}.` };
+      if (p.kind === "numeric") {
+        const kind = /price|cost|budget/i.test(p.col) ? "max" : "min";
+        return { param, column: p.col, kind, description: `${kind === "max" ? "Maximum" : "Minimum"} ${label}.` };
+      }
+      return { param, column: p.col, kind: "enum", values: [...new Set(p.values)], description: `Filter by ${label}.` };
+    });
 }
 
+function selectCompareRows(profiles: ColProfile[], max: number): CompareRow[] {
+  return profiles
+    .filter((p) => p.kind === "boolean" || p.kind === "numeric" || p.kind === "enum")
+    .sort((a, b) => b.score - a.score)
+    .slice(0, max)
+    .map((p) => {
+      const { label, suffix } = labelAndSuffix(p.col);
+      return suffix ? { label, key: p.col, suffix } : { label, key: p.col };
+    });
+}
+
+// Columns that look like a usable category facet — surfaced for human review.
+function suggestCategoryColumns(profiles: ColProfile[]): { col: string; values: string[] }[] {
+  return profiles
+    .filter((p) => p.kind === "enum" && p.coverage >= 0.6)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((p) => ({ col: p.col, values: [...new Set(p.values)] }));
+}
+
+// ── scaffold a starter config.ts ──────────────────────────────────────────────
 function writeStarterConfig(
   configPath: string,
   labels: Record<string, string>,
   filters: InferredFilter[],
-  compareRows: Array<{ label: string; key: string; suffix?: string }>,
+  compareRows: CompareRow[],
+  categoryHints: { col: string; values: string[] }[],
 ): void {
   const q = (s: string) => JSON.stringify(s);
+  const hasCategories = Object.keys(labels).length > 0;
+
   const filterLines = filters
     .map((f) => {
-      const values = f.kind === "enum" ? `, values: ${JSON.stringify(f.values)}` : "";
-      return `      { param: ${q(f.param)}, column: ${q(f.column)}, kind: ${q(f.kind)}${values}, description: ${q(f.description)} },`;
+      const extra =
+        f.kind === "enum" ? `, values: ${JSON.stringify(f.values)}` : f.kind === "boolean" ? `, trueValue: ${q(f.trueValue)}` : "";
+      return `      { param: ${q(f.param)}, column: ${q(f.column)}, kind: ${q(f.kind)}${extra}, description: ${q(f.description)} },`;
     })
     .join("\n");
   const compareLines = compareRows
     .map((r) => `      { label: ${q(r.label)}, key: ${q(r.key)}${r.suffix ? `, suffix: ${q(r.suffix)}` : ""} },`)
     .join("\n");
-  const categoryAnswers = [...Object.values(labels), "Not sure"];
-  const filterList = filters.map((f) => f.param).join(", ") || "(none inferred)";
+
+  const guided = hasCategories
+    ? `{ rank: 1, question: "Which category best fits your need?", answer_space: ${JSON.stringify([...Object.values(labels), "Not sure"])} }`
+    : `{ rank: 1, question: "TODO: what should we narrow down first? (e.g. main use case)", answer_space: ["Option A", "Option B", "Not sure"] }`;
+
+  const categoryComment =
+    !hasCategories && categoryHints.length
+      ? `// No category column was found — running FILTER-ONLY. Columns you COULD\n` +
+        `// designate as a category facet (REVIEW for usefulness — this is your\n` +
+        `// decision, not automatic; set CONFIG.categoryColumn and re-generate):\n` +
+        categoryHints.map((h) => `//   • ${h.col}: ${h.values.slice(0, 8).join(", ")}`).join("\n") +
+        "\n"
+      : "";
 
   const content = `import type { SelectorConfig } from ${q(CONFIG.typesImport)};
 
-// STARTER CONFIG — auto-scaffolded from your catalogue columns. Review the
-// inferred search.filters and compare.rows, then fill in the TODOs (brand,
-// copy, and especially customInstructions / filter hygiene).
-export const config: SelectorConfig = {
+// STARTER CONFIG — auto-scaffolded. Review the inferred search.filters /
+// compare.rows (a reasonable subset, not every column) and fill in the TODOs.
+${categoryComment}export const config: SelectorConfig = {
   brand: {
     name: "TODO Your Company",
     accentColor: "#0D2B73",
@@ -208,33 +284,22 @@ export const config: SelectorConfig = {
     title: "TODO Product Selector",
     subtitle: "Find the right product for your needs",
     inputPlaceholder: "Describe what you need, or compare two products...",
-    starterPrompts: [
-      "Help me find the right product",
-      "Compare two products",
-    ],
+    starterPrompts: ["Help me find the right product", "Compare two products"],
   },
 
-  // TODO: teach the agent your taxonomy and how to map user words to the
-  // filters below (${filterList}).
+  // TODO: teach the agent your taxonomy and how to map user words to the filters.
   customInstructions: \`
 You are the TODO product selector assistant. Help users find the right product conversationally.
-
-Categories: ${Object.values(labels).join(", ")}.
-
+${hasCategories ? `Categories: ${Object.values(labels).join(", ")}.\n` : ""}
 Use search_products early and map the user's needs to the available filters.
 Use compare_products for exactly 2 items (a visual card renders — don't repeat it as a table).
 Use book_meeting when the user wants pricing or to talk to sales.
-Always link products using the url field.
 \`.trim(),
 
   guidedPaths: {
     enabled: true,
     questions: [
-      {
-        rank: 1,
-        question: "Which category best fits your need?",
-        answer_space: ${JSON.stringify(categoryAnswers)},
-      },
+      ${guided},
     ],
   },
 
@@ -267,69 +332,74 @@ function main(): void {
 
   let families = sheetRows(wb, CONFIG.familiesSheet);
   let parts = sheetRows(wb, CONFIG.partsSheet);
+  if (parts.length === 0 && families.length === 0) parts = sheetRows(wb, wb.SheetNames[0]);
 
-  // CSV / single-sheet workbooks: treat the first sheet as parts.
-  if (parts.length === 0 && families.length === 0) {
-    const first = wb.SheetNames[0];
-    parts = sheetRows(wb, first);
+  const sample = parts.length ? parts : families;
+  const columns = uniqueColumns(sample);
+
+  // Category mode: derive hook > explicit column > none (filter-only).
+  const hasCategoryColumn = columns.includes(CONFIG.categoryColumn);
+  const useCategory = !!CONFIG.deriveCategory || hasCategoryColumn;
+  if (useCategory) {
+    for (const row of [...families, ...parts]) {
+      const cat = CONFIG.deriveCategory ? CONFIG.deriveCategory(row) : row[CONFIG.categoryColumn];
+      row.category = (cat ?? CONFIG.defaultCategory) as string;
+      if (CONFIG.categoryColumn !== "category") delete row[CONFIG.categoryColumn];
+    }
   }
 
-  const categories: string[] = [
-    ...new Set([...families, ...parts].map((r) => r.category ?? CONFIG.defaultCategory)),
-  ];
-  const labels: Record<string, string> = { ...CONFIG.categoryLabels };
-  for (const c of categories) if (!(c in labels)) labels[c] = c;
+  const labels: Record<string, string> = {};
+  if (useCategory) {
+    const cats = [...new Set([...families, ...parts].map((r) => r.category ?? CONFIG.defaultCategory))];
+    for (const c of cats) labels[c] = CONFIG.categoryLabels[c] ?? c;
+  }
 
+  // Inference (over parts, the detailed rows).
+  const exclude = new Set(
+    ["category", CONFIG.fields.familyName, CONFIG.fields.partNumber, CONFIG.fields.partUrl, "Description", ...CONFIG.fields.keyword].filter(
+      (c): c is string => !!c,
+    ),
+  );
+  const profiles = profileAll(sample, exclude);
+  const filters = selectFilters(profiles, CONFIG.maxFilters);
+  const compareRows = selectCompareRows(profiles, 12);
+  const categoryHints = suggestCategoryColumns(profiles);
+
+  const fields = { ...CONFIG.fields };
   const banner =
     `// AUTO-GENERATED by scripts/generate-catalogue.ts — do not edit by hand.\n` +
     `// Source: ${src.replace(ROOT + "/", "")}\n` +
     `// ${families.length} families · ${parts.length} parts\n`;
-
   const body =
     `import type { Catalogue } from "${CONFIG.schemaImport}";\n\n` +
     `export const catalogue: Catalogue = {\n` +
     `  families: ${JSON.stringify(families, null, 2)},\n` +
     `  parts: ${JSON.stringify(parts, null, 2)},\n` +
     `  categoryLabels: ${JSON.stringify(labels, null, 2)},\n` +
-    `  fields: ${JSON.stringify(CONFIG.fields, null, 2)},\n` +
+    `  fields: ${JSON.stringify(fields, null, 2)},\n` +
     `};\n`;
 
+  mkdirSync(dirname(CONFIG.outFile), { recursive: true });
   writeFileSync(CONFIG.outFile, banner + "\n" + body);
   console.log(
-    `Wrote ${CONFIG.outFile.replace(ROOT + "/", "")} — ` +
-      `${families.length} families, ${parts.length} parts, ` +
-      `categories: ${categories.join(", ")}`,
+    `Wrote ${CONFIG.outFile.replace(ROOT + "/", "")} — ${families.length} families, ${parts.length} parts, ` +
+      (useCategory ? `categories: ${Object.keys(labels).join(", ")}` : "no category facet (filter-only)"),
   );
 
-  // Scaffold a starter config.ts from the columns — but never clobber one that
-  // already exists (the curated examples have hand-tuned configs).
+  // Human-in-the-loop: surface category candidates rather than auto-picking one.
+  if (!useCategory && categoryHints.length) {
+    console.log(`\nNo category column found — running filter-only. Columns you COULD designate as a category`);
+    console.log(`(review for usefulness — your call, not automatic; set CONFIG.categoryColumn and re-run):`);
+    for (const h of categoryHints) console.log(`  • ${h.col}  →  ${h.values.slice(0, 8).join(", ")}`);
+  }
+
   if (CONFIG.scaffoldConfig) {
     const configPath = join(dirname(CONFIG.outFile), "config.ts");
-    const exclude = new Set(
-      [
-        "category",
-        CONFIG.fields.familyName,
-        CONFIG.fields.partNumber,
-        CONFIG.fields.partUrl,
-        "Description",
-        ...CONFIG.fields.keyword,
-      ].filter((c): c is string => !!c),
-    );
-    const filters = inferFilters(parts.length ? parts : families, exclude);
-    const compareRows = inferCompareRows(parts.length ? parts : families, exclude);
-
     if (existsSync(configPath)) {
-      console.log(
-        `config.ts already exists — left untouched. Inferred filters you could add: ` +
-          `${filters.map((f) => f.param).join(", ") || "(none)"}`,
-      );
+      console.log(`\nconfig.ts exists — left untouched. Inferred filters: ${filters.map((f) => f.param).join(", ") || "(none)"}`);
     } else {
-      writeStarterConfig(configPath, labels, filters, compareRows);
-      console.log(
-        `Wrote starter ${configPath.replace(ROOT + "/", "")} — ` +
-          `${filters.length} filters (${filters.map((f) => f.param).join(", ") || "none"}), ` +
-          `${compareRows.length} compare rows. Review the TODOs.`,
-      );
+      writeStarterConfig(configPath, labels, filters, compareRows, categoryHints);
+      console.log(`\nWrote starter config.ts — ${filters.length} filters (${filters.map((f) => f.param).join(", ")}), ${compareRows.length} compare rows. Review the TODOs.`);
     }
   }
 }

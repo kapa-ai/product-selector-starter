@@ -72,12 +72,12 @@ function numbersIn(value: string | null | undefined): number[] {
     .filter((n) => !isNaN(n));
 }
 
-function keywordText(row: Record<string, string | null>, keys: string[]): string {
+function keywordText(row: Record<string, string | null | undefined>, keys: string[]): string {
   return keys.map((k) => row[k]).filter(Boolean).join(" ").toLowerCase();
 }
 
 /** Apply one declared filter to a row. Absent cells are skipped, not failed. */
-function passesFilter(row: Record<string, string | null>, f: SearchFilter, value: unknown): boolean {
+function passesFilter(row: Record<string, string | null | undefined>, f: SearchFilter, value: unknown): boolean {
   if (value === undefined || value === null || value === "") return true;
   const cell = row[f.column];
   if (cell === undefined || cell === null) return true; // row doesn't carry this column
@@ -116,7 +116,7 @@ function rowMatches(
 }
 
 /** Deterministic relevance score: weighted keyword-term hits across fields. */
-function scoreRow(row: Record<string, string | null>, terms: string[], fields: string[]): number {
+function scoreRow(row: Record<string, string | null | undefined>, terms: string[], fields: string[]): number {
   if (!terms.length) return 0;
   let score = 0;
   const n = fields.length;
@@ -136,7 +136,7 @@ function scoreRow(row: Record<string, string | null>, terms: string[], fields: s
  *   3. else → catalogue order
  * Always tie-broken by original index, so the order is fully reproducible.
  */
-function rankRows<T extends Record<string, string | null>>(
+function rankRows<T extends Record<string, string | null | undefined>>(
   rows: T[],
   params: SearchParams,
   keywordKeys: string[],
@@ -226,7 +226,7 @@ export interface ComparedPart {
   category?: string;
   family?: string | null;
   type?: string | null;
-  specs?: Record<string, string | null>;
+  specs?: Record<string, string | null | undefined>;
   error?: string;
 }
 
@@ -239,7 +239,7 @@ export function compareProducts(
   const comparison = partNumbers.map((pn) => {
     const part = catalogue.parts.find((p) => (p[pnCol] ?? "").toLowerCase() === pn.trim().toLowerCase());
     if (!part) return { error: `Product '${pn}' not found.` };
-    const specs: Record<string, string | null> = {};
+    const specs: Record<string, string | null | undefined> = {};
     for (const { key } of rows) specs[key] = part[key] ?? null;
     return {
       part_number: part[pnCol],
