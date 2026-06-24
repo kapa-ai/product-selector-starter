@@ -169,10 +169,12 @@ routed to your inbox, a webhook, or your CRM:
 npm run build               # → dist/product-selector.js (single self-contained file)
 ```
 
-`dist/product-selector.js` is one self-contained file. **Add it to your website
-exactly like any other script** — serve it alongside your existing static assets
-and include the two lines below. If you already run a website, you already have
-everywhere you need to put this; there's no special CDN or hosting to set up.
+How you add it depends on how your site is built:
+
+**A — Script tag (CMS / no-code sites: WordPress, Webflow, Shopify, …).**
+`dist/product-selector.js` is one self-contained file (React and the SDK bundled
+in). Serve it from your site and paste two lines into your CMS's custom-code or
+footer block — no build step on your side:
 
 ```html
 <script src="/product-selector.js" defer></script>
@@ -189,9 +191,17 @@ everywhere you need to put this; there's no special CDN or hosting to set up.
 </script>
 ```
 
-The only backend you need is the small token endpoint in [`/server`](server/README.md)
-(it keeps your Kapa API key off the browser). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-for all `init()` options.
+**B — Import the code (a frontend you build yourself: React, no CMS).** If you
+own the frontend, skip the bundle and render the agent inside your own app —
+reuse the `AgentProvider` + `AgentPanel` + tools setup from `src/Widget.tsx`, or
+import and call `init()` from your own build. You get tighter integration with
+your routing, state, and styling, and no separate artifact to host.
+
+Either way, the only backend is the token endpoint in [`/server`](server/README.md)
+(it keeps your Kapa API key off the browser). An **iframe** is a third option,
+but you almost certainly don't need it — see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#choosing-how-to-embed) for the full
+comparison and all `init()` options.
 
 ## Try the other examples
 
