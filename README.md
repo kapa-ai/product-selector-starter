@@ -48,18 +48,32 @@ closest to your business, see how it's wired, then swap in your own data and
 copy. You can also add your own Kapa tools in `src/agent/tools.tsx` when you need
 more than the five built in.
 
-## What the built-in tools do
+## What the agent does out of the box
 
-Five tools ship ready to use — the agent calls them as the conversation needs,
-and each renders its own UI. (Add your own in `src/agent/tools.tsx`.)
+Every Product Selector comes with **five tools already wired into the agent** —
+no setup required. The agent decides which to call as the conversation unfolds,
+and each renders its own UI in the chat. (Need more? Add your own in
+`src/agent/tools.tsx`.)
 
-| Tool | What it does |
-| --- | --- |
-| `search_products` | Precise, deterministic filtering over your catalogue → a ranked, capped results list with "Show all". |
-| `get_product_specs` | Full spec sheet for one product. |
-| `compare_products` | Side-by-side visual comparison of two products. |
-| `discover_requirements` | A short guided questionnaire (toggleable) for unsure visitors; answers drive the next search. |
-| `book_meeting` | An approval-gated contact form; the lead goes to email / webhook / your CRM. |
+- **`search_products` — find the matching products.** Lets the agent query your
+  catalogue/database with *exact* filters (e.g. "BLE 6.0 + Matter + ≥ 2 MB flash")
+  and get back **every** match — deterministically, never guessed. Results render
+  as a ranked, capped list with "Show all", so the visitor sees the real, complete
+  set rather than the model's paraphrase.
+- **`get_product_specs` — go deeper on one product.** Returns the full detail for a
+  single product when a visitor wants to dig in — the equivalent of opening the
+  data sheet, without leaving the conversation.
+- **`compare_products` — put two side by side.** Renders a side-by-side card across
+  the same parameters, so a visitor torn between two products that both seem to fit
+  can glance at the real differences and decide.
+- **`discover_requirements` — help people who don't know where to start.** Spins up
+  a few guiding questions — what they're building, the requirements that matter to
+  them, price sensitivity, and so on — and turns the answers into a targeted
+  search. The on-ramp for visitors who can't yet put their need into words.
+- **`book_meeting` — hand off to Sales at the right moment.** Once a visitor has the
+  help they came for, connects them to your Sales team **with the full Kapa
+  conversation attached as context**, routing the lead to your inbox, a webhook, or
+  your CRM.
 
 The examples below are from the shipped **Acme** semiconductor example. (The grey
 line under each agent reply — e.g. `discover_requirements (user_context: …)` — is
