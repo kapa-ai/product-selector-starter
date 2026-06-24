@@ -1,17 +1,52 @@
 # Product Selector Starter
 
-An **embeddable product-selector agent** built on the [Kapa Agent SDK](https://docs.kapa.ai/dev/agent/). Drop one `<script>` tag on any website and visitors get a chat bubble that opens a conversational assistant which can:
+## The problem
+
+Companies with large catalogues of technical products lose people at the very
+first step. A visitor arrives with a need in their own words — *"I'm building a
+battery-powered smart-home sensor that needs to speak Matter"* — and the website
+answers with dozens of dense spec sheets and filter tables. They don't know
+which filters even matter for *this* company's products, so they can't translate
+their use case into the right query, and they give up.
+
+Both sides lose, and neither understands why:
+
+- **The visitor** concludes *"they don't make what I need."*
+- **The company** wonders *"why aren't customers finding the products that solve their exact need?"*
+
+The gap isn't the catalogue — it's the translation between a user's intent and
+the company's way of describing its products.
+
+## What this is
+
+**Kapa Product Selector** bridges that gap: an embeddable, conversational agent
+that understands the visitor's intent *and* your product catalogue. It maps
+everyday language onto the filters that actually matter for your products,
+searches your catalogue deterministically (no hallucinated specs), and walks the
+visitor to the products that genuinely fit — then books a call if they want one.
+
+Built on the [Kapa Agent SDK](https://docs.kapa.ai/dev/agent/), it drops onto any
+site as a single `<script>` — a chat bubble that opens a sidebar assistant which can:
 
 - 🔎 **Search your catalogue** with precise, deterministic lookups (no hallucinated specs)
 - 🆚 **Compare two products** side-by-side in a visual card
-- 🧭 **Guide unsure visitors** through a short set of clickable questions (toggleable)
-- 📅 **Book a sales call**, delivering the lead to your inbox, a webhook, or your CRM
+- 🧭 **Guide unsure visitors** through a short set of clickable questions
+- 📅 **Book a sales call**, routing the lead to your inbox, a webhook, or your CRM
 
-It ships with **three ready-made example domains** — wireless chips, water pumps, and espresso machines — all driven by the *same* engine, to show how generic it is. Switch between them by changing one import, or swap in your own data.
+## Clone it — you're ~90% there
 
-> This is a **starter / example** meant to get a working selector live fast. The
-> five built-in tools cover the common cases; you can add your own Kapa tools in
-> `src/agent/tools.tsx` whenever you need more.
+This is a **working starter, not a framework to learn**. Clone it and the whole
+thing already exists: the agent, the conversational UI, the five tools, the
+embed, the lead-capture backend. The remaining ~10% is **configuration** —
+pointing it at your catalogue and tailoring the system prompt, filters, and
+branding to your company.
+
+To make that concrete, it ships with **three example domains** — wireless chips,
+water pumps, and espresso machines — all driven by the *same* engine. They exist
+purely as starting points and inspiration, **not** as the product: pick the one
+closest to your business, see how it's wired, then swap in your own data and
+copy. You can also add your own Kapa tools in `src/agent/tools.tsx` when you need
+more than the five built in.
 
 ## What the built-in tools do
 
