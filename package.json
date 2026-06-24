@@ -1,0 +1,38 @@
+{
+  "name": "product-selector-starter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An embeddable Product Selector Agent built on the Kapa Agent SDK.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "generate:catalogue": "tsx scripts/generate-catalogue.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^2.8.2",
+    "@emotion/cache": "^11.11.0",
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.5",
+    "@kapaai/agent-core": "^0.1.8",
+    "@kapaai/agent-react": "^0.1.13",
+    "@tabler/icons-react": "^3.30.0",
+    "framer-motion": "^11.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.0",
+    "xlsx": "^0.18.5"
+  }
+}
