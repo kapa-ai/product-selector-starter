@@ -43,7 +43,7 @@ export interface SearchParams {
   [param: string]: unknown;
 }
 
-const DEFAULT_MAX_RESULTS = 15;
+const DEFAULT_MAX_RESULTS = 6;
 const DEFAULT_RESULT_LIMIT = 50;
 
 function contains(field: string | null | undefined, query: string): boolean {
