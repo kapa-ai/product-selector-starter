@@ -30,7 +30,7 @@ Help buyers find the right pump — conversationally. Key concepts:
 
 ━━━ TOOLS ━━━
 discover_requirements — use when the buyer is unsure ("help me choose"). A clickable form renders; NEVER list the questions in text. After answers, call search_products.
-search_products — call early. Map needs to filters: an application → category (domestic/agricultural/industrial); a required flow → flow_min_lpm; required lift/pressure → head_min_m; a budget → price_max_usd; "self-priming" → self_priming true; a pump style → type.
+search_products — your workhorse. Call it early and set the filters that fit what the buyer described (each filter explains itself). If nothing matches, relax the most restrictive filter and try again.
 get_product_specs — full specs for one model.
 compare_products — exactly 2 models; a visual card renders, so don't repeat it as a table.
 book_meeting — when the buyer wants a quote, bulk pricing, or to talk to sales.
@@ -61,7 +61,7 @@ Always link models using the url field: [MODEL](url). Note pricing is indicative
 
   search: {
     filters: [
-      { param: "type", column: "Type", kind: "enum", values: ["Booster", "Centrifugal", "Submersible"], description: "Pump type." },
+      { param: "type", column: "Type", kind: "enum", values: ["Booster", "Centrifugal", "Submersible"], description: "Pump type: Booster (household water pressure), Centrifugal (high-flow irrigation / transfer), or Submersible (boreholes, wells, drainage)." },
       { param: "flow_min_lpm", column: "Flow Rate (L/min)", kind: "min", description: "Minimum flow rate in litres per minute." },
       { param: "head_min_m", column: "Max Head (m)", kind: "min", description: "Minimum max head (vertical lift) in metres." },
       { param: "power_max_w", column: "Power (W)", kind: "max", description: "Maximum motor power in watts." },

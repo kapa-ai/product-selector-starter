@@ -31,7 +31,7 @@ Help engineers find the right device — conversationally.
 
 ━━━ TOOLS ━━━
 discover_requirements — use when the user is vague ("help me find a chip"). A clickable form renders; NEVER list the questions in text. After they answer, call search_products.
-search_products — call early. Map words to filters: "Matter/Thread/Zigbee" → category multiprotocol, protocol "Matter"; "audio/headphones" → has_audio true; "Wi-Fi" → category wifi; "module" → type Module, "chip/SoC" → type SoC.
+search_products — your workhorse. Call it early and set the filters that fit what the user described (each filter explains itself). If nothing matches, relax the most restrictive filter and try again.
 get_product_specs — full specs for one part number.
 compare_products — exactly 2 parts; a visual card renders, so don't repeat it as a table.
 book_meeting — when the user wants pricing or to talk to an engineer.
@@ -62,11 +62,11 @@ Always link parts using the url field: [PART](url). Offer to connect with an eng
 
   search: {
     filters: [
-      { param: "type", column: "Type", kind: "enum", values: ["SoC", "Module"], description: "Product type: SoC (bare chip) or Module (with antenna)." },
-      { param: "protocol", column: "Protocols", kind: "text", description: "Protocol keyword, e.g. 'Matter', 'Zigbee', 'Thread', 'Bluetooth Classic', 'Wi-Fi'." },
+      { param: "type", column: "Type", kind: "enum", values: ["SoC", "Module"], description: "Set 'SoC' for a bare chip (needs antenna/RF design) or 'Module' for a certified part with an integrated antenna." },
+      { param: "protocol", column: "Protocols", kind: "text", description: "A protocol or ecosystem the product must support, e.g. 'Matter', 'Zigbee', 'Thread', 'Bluetooth Classic', 'Wi-Fi'. Use for smart-home / mesh needs." },
       { param: "ble_version_min", column: "BLE Version", kind: "min", description: "Minimum Bluetooth LE version, e.g. 5.4 or 6.0." },
       { param: "flash_min_kb", column: "Flash (KB)", kind: "min", description: "Minimum flash memory in KB." },
-      { param: "has_audio", column: "Has Audio", kind: "boolean", description: "Require integrated audio capability." },
+      { param: "has_audio", column: "Has Audio", kind: "boolean", description: "Require integrated audio (mics / speaker output). Set this for headphones, earbuds, speakers, or any audio device." },
     ],
     // When there's no keyword to rank by, list the highest-memory parts first.
     defaultSort: { column: "Flash (KB)", direction: "desc" },

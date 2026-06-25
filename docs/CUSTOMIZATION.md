@@ -12,7 +12,7 @@ imports to switch between `semiconductors`, `water-pumps`, and `espresso-machine
 | **Which domain is live** | `selector.config.ts` | Point the two imports at another `examples/<name>/`. |
 | **The products** | `catalogue/source/` + `npm run generate:catalogue` | Drop in your spreadsheet, regenerate the example's `data.ts`. |
 | **Brand look** (colour, logo, title) | `config.ts → brand` (or `init()`) | One hex + one logo URL drives the bubble, buttons, and panel theme. |
-| **What the agent says / how it picks products** | `config.ts → customInstructions` | The system prompt — your taxonomy + filter hygiene. |
+| **What the agent says / how it picks products** | `config.ts → customInstructions` | The system prompt — domain context + when to use which tool. |
 | **Which filters search exposes** | `config.ts → search.filters` | Declare the parameters the agent can filter on — no code. |
 | **Welcome copy & example chips** | `config.ts → branding` | Title, subtitle, placeholder, starter prompts. |
 | **Guided questions** (on/off + content) | `config.ts → guidedPaths` | Flip `enabled`; edit the `questions` array. |
@@ -44,10 +44,14 @@ Two layers: **`config.ts`** (`SelectorConfig`, build-time content) and
 | `starterPrompts` | string[]? | Quick-start chips shown before the first message. |
 
 ### `customInstructions` (string) — **the most important field**
-The system prompt. Teach the agent your catalogue taxonomy and, crucially,
-**filter hygiene**: how to map a user's words onto `search_products` parameters.
-The shipped prompts are good templates — keep the structure (categories → key
-concepts → tool usage → style) and rewrite for your products.
+The system prompt. Use it for **domain context** (what your products are, and the
+concepts and terms a buyer uses) and **tool strategy** (when to reach for which
+tool). Do **not** encode mechanical phrase→filter rules here (*"if they say
+'audio', set has_audio"*) — that's brittle and won't scale. The agent maps a
+user's words onto `search_products` parameters from the **filter descriptions**
+(below), so put that effort there instead. The shipped prompts are good
+templates — keep the structure (categories → key concepts → tool usage → style)
+and rewrite for your products.
 
 ### `search.filters` (`SearchFilter[]`) — what `search_products` can filter on
 This is what makes the engine domain-agnostic. Each filter becomes a parameter
@@ -70,14 +74,17 @@ reads; `description` is what the model sees. (`category`, `keyword`, and
 // espresso example
 filters: [
   { param: "type", column: "Type", kind: "enum",
-    values: ["Manual", "Semi-automatic", "Super-automatic"], description: "Machine type." },
+    values: ["Manual", "Semi-automatic", "Super-automatic"],
+    description: "How hands-on: Manual (lever), Semi-automatic (you grind/tamp), Super-automatic (one-touch)." },
   { param: "built_in_grinder", column: "Built-in Grinder", kind: "boolean", description: "Require a built-in grinder." },
   { param: "price_max_usd", column: "Price (USD)", kind: "max", description: "Maximum price in USD." },
 ]
 ```
 
-Keep the filter `param` names and `customInstructions` filter-hygiene in sync so
-the model knows when to use each.
+The `description` (and, for `enum`, the `values`) is how the agent decides when
+and how to use each filter — write it for the model, naming the terms a user
+might say. **This is where the natural-language → filter mapping lives**, not in
+`customInstructions`.
 
 **Results, ranking & completeness.** `search_products` scans the whole catalogue
 (deterministic, exhaustive), ranks the matches, and renders them as an

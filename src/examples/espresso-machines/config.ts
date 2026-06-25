@@ -30,7 +30,7 @@ Help shoppers find the right machine — conversationally. Key concepts:
 
 ━━━ TOOLS ━━━
 discover_requirements — use when the shopper is unsure ("help me pick"). A clickable form renders; NEVER list the questions in text. After answers, call search_products.
-search_products — call early. Map wants to filters: hands-on vs convenience → type; a budget → price_max_usd; "built-in grinder" → built_in_grinder true; "touch screen" → touch_screen true; "pressure gauge" → pressure_gauge true.
+search_products — your workhorse. Call it early and set the filters that fit what the shopper described (each filter explains itself). If nothing matches, relax the most restrictive filter and try again.
 get_product_specs — full specs for one model.
 compare_products — exactly 2 machines; a visual card renders, so don't repeat it as a table.
 book_meeting — when the shopper wants a demo, bulk/office pricing, or to talk to the team.
@@ -61,7 +61,7 @@ Always link models using the url field: [MODEL](url).
 
   search: {
     filters: [
-      { param: "type", column: "Type", kind: "enum", values: ["Manual", "Semi-automatic", "Super-automatic"], description: "Machine type." },
+      { param: "type", column: "Type", kind: "enum", values: ["Manual", "Semi-automatic", "Super-automatic"], description: "How hands-on the machine is: Manual (lever, full control), Semi-automatic (you grind/tamp, it pulls the shot), or Super-automatic (one-touch bean-to-cup)." },
       { param: "pressure_gauge", column: "Pressure Gauge", kind: "boolean", description: "Require a pressure gauge." },
       { param: "touch_screen", column: "Touch Screen", kind: "boolean", description: "Require a touch screen." },
       { param: "built_in_grinder", column: "Built-in Grinder", kind: "boolean", description: "Require a built-in grinder." },
