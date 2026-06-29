@@ -37,8 +37,7 @@ sidebar assistant. Out of the box it can:
 
 ## You're most of the way there when you clone it
 
-This is a working starter, not a framework to learn. Clone it and everything
-already runs: the assistant, the chat UI, the five tools, the embed, and the
+Clone it and everything already runs: the assistant, the chat UI, the five tools, the embed, and the
 lead-capture backend. What's left is configuration — pointing it at your
 catalogue and tailoring the prompt, filters, and branding to your company.
 
